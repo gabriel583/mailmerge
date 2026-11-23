@@ -58,6 +58,7 @@ button.primary:hover:not(:disabled) { background: var(--accent-dark); }
 button.secondary { background: #fff; }
 button.secondary:hover:not(:disabled) { background: var(--bg-soft); }
 button:disabled { opacity: 0.5; cursor: default; }
+.note { background: #fff8e6; border: 1px solid #f0d9a8; border-radius: 4px; padding: 8px 10px; font-size: 12px; line-height: 1.45; margin: 10px 0 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 4px; }

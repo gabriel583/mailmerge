@@ -306,6 +306,15 @@ function updateSelectionUi(visible) {
   $("applyBtn").disabled = !ready;
   $("draftsBtn").disabled = !ready;
   $("draftsBtn").textContent = n > 1 ? `Abrir ${n} rascunhos` : "Abrir rascunho";
+
+  // No modo de escrita, várias linhas viram UM só email: avisar como fazer um email por linha.
+  const multi = state.mode === "compose" && n > 1;
+  $("multiHint").hidden = !multi;
+  if (multi)
+    $("multiHint").textContent =
+      `Atenção: aqui as ${n} linhas vão todas para UM só email, com os valores da 1.ª linha. ` +
+      "Para enviar um email por linha (cada pessoa com o seu nome), envia este modelo para ti próprio, " +
+      'abre-o na Caixa de Entrada e usa o Excel Merge lá: o botão passa a ser "Abrir rascunhos".';
 }
 
 /** Número da linha no Excel (cabeçalho = linha 1). */
