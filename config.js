@@ -5,7 +5,7 @@
  * Se o preencheres, vale para todos e o campo do painel deixa de ser preciso.
  */
 window.MAILMERGE_CONFIG = {
-  clientId: "",
+  clientId: "594ff46a-cb55-45ad-ae02-959160fc6764",
   // Pausa entre envios, em milissegundos. O Exchange aceita cerca de 30 mensagens por minuto.
   delayMs: 2500,
 };
