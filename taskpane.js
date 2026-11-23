@@ -54,6 +54,7 @@ Office.onReady((info) => {
       : "Este email é o modelo. \"Enviar\" manda um email por linha, cada um com os seus valores. \"Abrir rascunhos\" abre-os para enviares à mão.";
 
   bindEvents();
+  renderClientIdState();
   renderColumnSelects();
   readTemplate().catch((e) => setStatus("Não consegui ler o email: " + e.message, "error"));
 
@@ -113,6 +114,7 @@ function bindEvents() {
   $("resetBtn").addEventListener("click", () => guard(resetTemplate));
   $("draftsBtn").addEventListener("click", () => guard(openDrafts));
   $("sendBtn").addEventListener("click", () => guard(sendAll));
+  $("saveClientIdBtn").addEventListener("click", () => guard(saveClientId));
   $("stopBtn").addEventListener("click", () => {
     state.stop = true;
     $("stopBtn").disabled = true;
@@ -520,8 +522,13 @@ async function openDrafts() {
  */
 async function sendAll() {
   const sel = selectedIndexes();
-  if (!Graph.configured())
-    throw new Error('O envio automático ainda não está configurado: falta o Client ID no ficheiro config.js (ver README, secção "Envio automático").');
+  if (!Graph.configured()) {
+    $("settings").open = true;
+    $("clientIdInput").focus();
+    $("settings").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setStatus('Para enviar automaticamente, cola em baixo o ID da aplicação e carrega em "Guardar" (só é preciso uma vez).', "warn");
+    return;
+  }
   if (!$("toCol").value) throw new Error("Escolhe primeiro a coluna dos destinatários.");
 
   if (!state.confirmSend) {
@@ -598,6 +605,29 @@ async function sendAll() {
     `${ok} email(s) enviados a partir de ${state.sender}. Estão nos Itens Enviados.${tail}` + (problems.length ? "\n" + problems.join("\n") : ""),
     problems.length ? "warn" : "ok"
   );
+}
+
+// ---------- Configuração do envio automático ----------
+
+function renderClientIdState() {
+  const source = Graph.clientIdSource(); // "config" | "manifest" | "painel"
+  const fixed = source !== "painel";
+  const id = Graph.clientId();
+  $("clientIdInput").value = id;
+  $("clientIdInput").disabled = fixed;
+  $("saveClientIdBtn").disabled = fixed;
+  $("clientIdState").textContent =
+    source === "config" ? "Definido no config.js ✓"
+    : source === "manifest" ? "Definido na instalação ✓"
+    : id ? "Configurado ✓" : "Ainda não configurado.";
+}
+
+async function saveClientId() {
+  const v = await Graph.saveClientId($("clientIdInput").value);
+  state.confirmSend = false;
+  renderClientIdState();
+  updateSelectionUi(visibleIndexes());
+  setStatus(v ? "ID guardado. Já podes usar o botão Enviar." : "ID removido.", "ok");
 }
 
 // ---------- UI ----------

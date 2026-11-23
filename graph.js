@@ -14,6 +14,40 @@
   let cached = null; // { token, exp }
 
   const config = () => window.MAILMERGE_CONFIG || {};
+  const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  /** ID que veio no endereço do painel, definido no manifest na instalação (taskpane.html?cid=…). */
+  function clientIdFromManifest() {
+    const v = new URLSearchParams(location.search).get("cid") || "";
+    return GUID.test(v.trim()) ? v.trim() : "";
+  }
+
+  /**
+   * Client ID, por esta ordem: config.js, manifest (instalação) ou o guardado no painel
+   * (roamingSettings da caixa de correio).
+   */
+  function clientId() {
+    const fromFile = String(config().clientId || "").trim();
+    if (fromFile) return fromFile;
+    if (clientIdFromManifest()) return clientIdFromManifest();
+    try {
+      return String(Office.context.roamingSettings.get("clientId") || "").trim();
+    } catch {
+      return "";
+    }
+  }
+
+  function saveClientId(value) {
+    const v = String(value || "").trim();
+    if (v && !GUID.test(v)) return Promise.reject(new Error("O ID tem o formato 00000000-0000-0000-0000-000000000000."));
+    const rs = Office.context.roamingSettings;
+    if (v) rs.set("clientId", v);
+    else rs.remove("clientId");
+    cached = null;
+    return new Promise((resolve, reject) =>
+      rs.saveAsync((r) => (r.status === Office.AsyncResultStatus.Succeeded ? resolve(v) : reject(new Error(r.error && r.error.message))))
+    );
+  }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   function folderUrl() {
@@ -22,7 +56,7 @@
 
   function openAuthDialog() {
     const hint = (Office.context.mailbox && Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.emailAddress) || "";
-    const url = folderUrl() + "auth.html?hint=" + encodeURIComponent(hint);
+    const url = folderUrl() + "auth.html?hint=" + encodeURIComponent(hint) + "&cid=" + encodeURIComponent(clientId());
     return new Promise((resolve, reject) => {
       Office.context.ui.displayDialogAsync(url, { height: 60, width: 30 }, (result) => {
         if (result.status !== Office.AsyncResultStatus.Succeeded) {
@@ -49,9 +83,9 @@
   }
 
   async function getToken(force) {
-    if (!force && cached && Date.now() < cached.exp - 2 * 60 * 1000) return cached.token;
+    if (!force && cached && cached.cid === clientId() && Date.now() < cached.exp - 2 * 60 * 1000) return cached.token;
     const res = await openAuthDialog();
-    cached = { token: res.accessToken, exp: Date.now() + res.expiresIn * 1000 };
+    cached = { token: res.accessToken, exp: Date.now() + res.expiresIn * 1000, cid: clientId() };
     return cached.token;
   }
 
@@ -121,7 +155,11 @@
   }
 
   window.Graph = {
-    configured: () => !!config().clientId,
+    configured: () => !!clientId(),
+    clientId,
+    clientIdSource: () =>
+      String(config().clientId || "").trim() ? "config" : clientIdFromManifest() ? "manifest" : "painel",
+    saveClientId,
     delayMs: () => Number(config().delayMs) || 2500,
     getToken,
     me,

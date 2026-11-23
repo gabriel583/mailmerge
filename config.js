@@ -1,7 +1,8 @@
 /*
- * Configuração do envio automático (Microsoft Graph).
- * clientId: o "ID da aplicação (cliente)" do registo no Microsoft Entra (ver README,
- * secção "Envio automático"). Enquanto estiver vazio, o botão "Enviar" explica o que falta.
+ * Configuração do envio automático (Microsoft Graph). Não é obrigatório mexer aqui.
+ * clientId: opcional. Se ficar vazio, cada pessoa cola o ID no próprio painel
+ * (secção "Envio automático"), que fica guardado na caixa de correio dela.
+ * Se o preencheres, vale para todos e o campo do painel deixa de ser preciso.
  */
 window.MAILMERGE_CONFIG = {
   clientId: "",
