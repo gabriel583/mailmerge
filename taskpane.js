@@ -30,6 +30,11 @@ const state = {
   previewIndex: null,
   template: null, // { subject, html }
   confirmBig: false,
+  confirmSend: false, // 1.º clique em "Enviar" pede confirmação
+  sender: "",
+  applied: false, // modo escrita: o email já tem uma linha aplicada
+  sent: new Set(), // linhas já enviadas pelo Graph nesta sessão
+  stop: false,
   busy: false,
 };
 
@@ -45,8 +50,8 @@ Office.onReady((info) => {
   $("modeBadge").textContent = state.mode === "compose" ? "A escrever" : "A ler";
   $("modeHint").textContent =
     state.mode === "compose"
-      ? "Os marcadores deste email são substituídos pelos valores da linha escolhida. Com várias linhas, os destinatários juntam-se e os valores vêm da primeira."
-      : "Este email é o modelo. Por cada linha selecionada abre-se uma mensagem nova já preenchida; só tens de rever e clicar Enviar.";
+      ? "Este email é o modelo. \"Enviar\" manda um email por linha, cada um com os seus valores. \"Aplicar a este email\" preenche só este email com uma linha."
+      : "Este email é o modelo. \"Enviar\" manda um email por linha, cada um com os seus valores. \"Abrir rascunhos\" abre-os para enviares à mão.";
 
   bindEvents();
   renderColumnSelects();
@@ -86,7 +91,11 @@ function bindEvents() {
       .then(() => setStatus("Modelo lido do email atual.", "ok"))
       .catch((e) => setStatus("Não consegui ler o email: " + e.message, "error"))
   );
-  $("toCol").addEventListener("change", () => { renderTable(); updatePreview(); });
+  $("toCol").addEventListener("change", () => {
+    state.confirmBig = state.confirmSend = false;
+    renderTable();
+    updatePreview();
+  });
   $("ccCol").addEventListener("change", updatePreview);
   $("toField").addEventListener("change", updatePreview);
   $("filter").addEventListener("input", renderTable);
@@ -95,7 +104,7 @@ function bindEvents() {
       if (e.target.checked) state.selected.add(i);
       else state.selected.delete(i);
     }
-    state.confirmBig = false;
+    state.confirmBig = state.confirmSend = false;
     renderTable();
     updatePreview();
   });
@@ -103,6 +112,12 @@ function bindEvents() {
   $("applyBtn").addEventListener("click", () => guard(applyToCurrent));
   $("resetBtn").addEventListener("click", () => guard(resetTemplate));
   $("draftsBtn").addEventListener("click", () => guard(openDrafts));
+  $("sendBtn").addEventListener("click", () => guard(sendAll));
+  $("stopBtn").addEventListener("click", () => {
+    state.stop = true;
+    $("stopBtn").disabled = true;
+    setStatus("A parar depois do email atual…", "warn");
+  });
 }
 
 // ---------- Office: helpers ----------
@@ -167,8 +182,9 @@ function loadSheet(name) {
   state.rows = rows;
   state.headers = headers;
   state.selected = new Set();
+  state.sent = new Set();
   state.previewIndex = null;
-  state.confirmBig = false;
+  state.confirmBig = state.confirmSend = false;
   $("fileInfo").textContent = `${rows.length} linha(s) · colunas: ${headers.join(", ")}`;
   renderColumnSelects();
   renderPlaceholders();
@@ -255,6 +271,7 @@ function renderTable() {
     tr.dataset.index = i;
     if (state.selected.has(i)) tr.classList.add("selected");
     if (i === state.previewIndex) tr.classList.add("previewing");
+    if (state.sent.has(i)) tr.classList.add("sent");
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = state.selected.has(i);
@@ -262,7 +279,8 @@ function renderTable() {
     tr.insertCell().appendChild(cb);
     const num = tr.insertCell();
     num.className = "rownum";
-    num.textContent = String(excelRow(i));
+    num.textContent = (state.sent.has(i) ? "✓ " : "") + excelRow(i);
+    if (state.sent.has(i)) num.title = "Já enviado";
     for (const h of cols) {
       const td = tr.insertCell();
       td.textContent = state.rows[i][h];
@@ -287,11 +305,11 @@ function onRowClick(e) {
   if (e.target.matches('input[type="checkbox"]')) {
     if (e.target.checked) state.selected.add(i);
     else state.selected.delete(i);
-    state.confirmBig = false;
+    state.confirmBig = state.confirmSend = false;
   } else if (!state.selected.has(i)) {
     // clicar na linha seleciona-a e mostra-a na pré-visualização
     state.selected.add(i);
-    state.confirmBig = false;
+    state.confirmBig = state.confirmSend = false;
   }
   state.previewIndex = state.selected.has(i) ? i : null;
   renderTable();
@@ -306,15 +324,21 @@ function updateSelectionUi(visible) {
   $("applyBtn").disabled = !ready;
   $("draftsBtn").disabled = !ready;
   $("draftsBtn").textContent = n > 1 ? `Abrir ${n} rascunhos` : "Abrir rascunho";
+  $("sendBtn").disabled = !ready;
+  $("sendBtn").textContent = state.confirmSend
+    ? `Confirmar: enviar ${n}`
+    : n > 1 ? `Enviar ${n} emails` : "Enviar 1 email";
 
-  // No modo de escrita, várias linhas viram UM só email: avisar como fazer um email por linha.
+  // No modo de escrita, várias linhas + "Aplicar" = UM só email: explicar a diferença.
   const multi = state.mode === "compose" && n > 1;
-  $("multiHint").hidden = !multi;
-  if (multi)
-    $("multiHint").textContent =
-      `Atenção: aqui as ${n} linhas vão todas para UM só email, com os valores da 1.ª linha. ` +
-      "Para enviar um email por linha (cada pessoa com o seu nome), envia este modelo para ti próprio, " +
-      'abre-o na Caixa de Entrada e usa o Excel Merge lá: o botão passa a ser "Abrir rascunhos".';
+  const hint = $("multiHint");
+  if (hint) {
+    hint.hidden = !multi;
+    if (multi)
+      hint.textContent =
+        `"Enviar ${n} emails" manda um email a cada pessoa, cada um com os seus valores. ` +
+        `"Aplicar a este email" junta as ${n} linhas num só email, com os valores da 1.ª linha.`;
+  }
 }
 
 /** Número da linha no Excel (cabeçalho = linha 1). */
@@ -351,15 +375,14 @@ function updatePreview() {
   let idx = state.previewIndex;
   if (idx == null || !state.selected.has(idx)) idx = sel.length ? sel[0] : 0;
 
-  // Em modo escrita com várias linhas, a mensagem junta todos os destinatários.
-  const group = state.mode === "compose" && sel.length > 1 ? sel : [idx];
-  const msg = buildMessage(group);
+  // Mostra o email de UMA linha, tal como sai no "Enviar" (clica noutra linha para a ver).
+  const msg = buildMessage([idx]);
   box.hidden = false;
-  $("pvRowLabel").textContent =
-    (sel.length ? "" : "Sem linhas selecionadas — a mostrar a 1.ª linha. ") +
-    (group.length > 1 ? `Valores da linha ${excelRow(group[0])}; destinatários de ${group.length} linhas.` : `Linha ${excelRow(idx)} do Excel.`);
-  const where = state.mode === "compose" && $("toField").value === "bcc" ? " (Bcc)" : "";
-  $("pvTo").textContent = (msg.to.valid.join("; ") || "—") + where;
+  const pos = sel.indexOf(idx);
+  $("pvRowLabel").textContent = sel.length
+    ? `Email da linha ${excelRow(idx)} do Excel` + (sel.length > 1 ? ` (${pos + 1} de ${sel.length}; clica noutra linha para a ver).` : ".")
+    : "Sem linhas selecionadas — a mostrar a 1.ª linha.";
+  $("pvTo").textContent = msg.to.valid.join("; ") || "—";
   $("pvCcLine").hidden = !$("ccCol").value;
   $("pvCc").textContent = msg.cc.valid.join("; ") || "—";
   $("pvSubject").textContent = msg.subject;
@@ -404,6 +427,7 @@ async function applyToCurrent() {
   if (invalid.length) warnings.push("Endereços ignorados por serem inválidos: " + invalid.join(", "));
 
   const what = sel.length > 1 ? `valores da linha ${excelRow(sel[0])}, destinatários de ${sel.length} linhas` : `linha ${excelRow(sel[0])}`;
+  state.applied = true;
   setStatus(`Aplicado (${what}). Revê e envia.` + (warnings.length ? "\n" + warnings.join("\n") : ""), warnings.length ? "warn" : "ok");
 }
 
@@ -431,6 +455,7 @@ async function resetTemplate() {
   const item = Office.context.mailbox.item;
   await officeAsync((cb) => item.body.setAsync(state.template.html, { coercionType: Office.CoercionType.Html }, cb));
   await officeAsync((cb) => item.subject.setAsync(state.template.subject, cb));
+  state.applied = false;
   setStatus("Modelo reposto.", "ok");
 }
 
@@ -443,7 +468,7 @@ async function openDrafts() {
     setStatus(`Vais abrir ${sel.length} janelas de mensagem. Clica outra vez no botão para confirmar.`, "warn");
     return;
   }
-  state.confirmBig = false;
+  state.confirmBig = state.confirmSend = false;
 
   const mailbox = Office.context.mailbox;
   const hasAsync = Office.context.requirements.isSetSupported("Mailbox", "1.9");
@@ -489,10 +514,98 @@ async function openDrafts() {
   setStatus(`${opened} rascunho(s) aberto(s).` + (problems.length ? "\n" + problems.join("\n") : ""), problems.length ? "warn" : "ok");
 }
 
+/**
+ * Envia um email por linha selecionada, pelo Microsoft Graph (ver graph.js).
+ * 1.º clique: inicia sessão e mostra de que conta vai sair; 2.º clique: envia.
+ */
+async function sendAll() {
+  const sel = selectedIndexes();
+  if (!Graph.configured())
+    throw new Error('O envio automático ainda não está configurado: falta o Client ID no ficheiro config.js (ver README, secção "Envio automático").');
+  if (!$("toCol").value) throw new Error("Escolhe primeiro a coluna dos destinatários.");
+
+  if (!state.confirmSend) {
+    // No modo escrita, relê o email para apanhar as últimas alterações (se ainda não foi aplicado)
+    if (state.mode === "compose" && !state.applied) await readTemplate();
+    setStatus("A iniciar sessão na conta Microsoft…", "ok");
+    const user = await Graph.me();
+    state.sender = user.mail || user.userPrincipalName || user.displayName || "?";
+    const mailbox = (Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.emailAddress) || "";
+    const notes = [];
+    if (mailbox && state.sender.toLowerCase() !== mailbox.toLowerCase())
+      notes.push(`Atenção: a sessão iniciada (${state.sender}) não é a desta caixa de correio (${mailbox}).`);
+    const again = sel.filter((i) => state.sent.has(i)).length;
+    if (again) notes.push(`${again} destas linhas já foram enviadas nesta sessão e vão ser enviadas outra vez.`);
+    const missing = buildMessage([sel[0]]).missing;
+    if (missing.length) notes.push("Marcadores sem coluna no Excel (ficam como estão): " + missing.map((k) => `{{${k}}}`).join(", "));
+    const noAddress = sel.filter((i) => !buildMessage([i]).to.valid.length).length;
+    if (noAddress) notes.push(`${noAddress} linha(s) sem email válido serão ignoradas.`);
+    state.confirmSend = true;
+    updateSelectionUi(visibleIndexes());
+    setStatus(
+      `Vais enviar ${sel.length} email(s), um por linha, a partir de ${state.sender}.` +
+        (notes.length ? "\n" + notes.join("\n") : "") +
+        "\nClica outra vez no botão para confirmar.",
+      "warn"
+    );
+    return;
+  }
+
+  state.confirmSend = false;
+  state.stop = false;
+  $("stopBtn").hidden = false;
+  $("stopBtn").disabled = false;
+  $("sendBtn").disabled = true;
+  const problems = [];
+  let ok = 0;
+  let failsInRow = 0;
+  try {
+    for (let n = 0; n < sel.length; n++) {
+      if (state.stop) {
+        problems.push(`Parado por ti: ${sel.length - n} linha(s) ficaram por enviar.`);
+        break;
+      }
+      const i = sel[n];
+      const line = `Linha ${excelRow(i)}`;
+      const msg = buildMessage([i]);
+      if (!msg.to.valid.length) {
+        problems.push(`${line}: sem email válido — ignorada.`);
+        continue;
+      }
+      setStatus(`A enviar ${n + 1} de ${sel.length} (${msg.to.valid.join(", ")})…`, "ok");
+      try {
+        await Graph.sendMail({ to: msg.to.valid, cc: msg.cc.valid, subject: msg.subject.slice(0, MAX_SUBJECT), html: msg.html });
+        ok++;
+        failsInRow = 0;
+        state.sent.add(i);
+        state.selected.delete(i); // evita reenviar por engano
+      } catch (e) {
+        problems.push(`${line}: ${e.message}`);
+        if (++failsInRow >= 3) {
+          problems.push("3 erros seguidos — envio interrompido.");
+          break;
+        }
+      }
+      if (n < sel.length - 1 && !state.stop) await new Promise((r) => setTimeout(r, Graph.delayMs()));
+    }
+  } finally {
+    $("stopBtn").hidden = true;
+    renderTable();
+    updatePreview();
+  }
+  const tail = state.mode === "compose" ? " Este rascunho (o modelo) pode ser descartado." : "";
+  setStatus(
+    `${ok} email(s) enviados a partir de ${state.sender}. Estão nos Itens Enviados.${tail}` + (problems.length ? "\n" + problems.join("\n") : ""),
+    problems.length ? "warn" : "ok"
+  );
+}
+
 // ---------- UI ----------
 
 function setStatus(text, kind) {
   const el = $("status");
   el.textContent = text;
   el.className = kind || "";
+  // a barra de estado é fixa no fundo: reserva espaço para não tapar os botões
+  document.body.style.paddingBottom = (text ? el.offsetHeight + 16 : 80) + "px";
 }

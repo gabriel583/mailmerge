@@ -78,6 +78,7 @@ tbody tr:hover { background: #fafafa; }
 tbody tr.selected { background: #eef7f1; }
 tbody tr.previewing { box-shadow: inset 3px 0 0 var(--accent); }
 td.rownum { color: var(--muted); }
+tbody tr.sent td.rownum { color: var(--ok); font-weight: 600; }
 
 .preview { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
 .pv-meta { padding: 8px; background: var(--bg-soft); border-bottom: 1px solid var(--border); display: grid; gap: 2px; word-break: break-all; }

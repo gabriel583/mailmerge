@@ -8,6 +8,8 @@
   <!-- SheetJS (leitura do Excel). Para não depender do CDN, descarrega este ficheiro para a pasta e muda o src. -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="merge.js"></script>
+  <script src="config.js"></script>
+  <script src="graph.js"></script>
   <link rel="stylesheet" href="taskpane.css" />
 </head>
 <body>
@@ -51,7 +53,7 @@
       <select id="ccCol"></select>
     </div>
     <div class="field compose-only">
-      <label for="toField">Colocar destinatários em</label>
+      <label for="toField">No "Aplicar a este email", colocar destinatários em</label>
       <select id="toField">
         <option value="to">Para</option>
         <option value="bcc">Bcc</option>
@@ -75,7 +77,7 @@
   </section>
 
   <section>
-    <h2><span class="step">5</span>Pré-visualizar e aplicar</h2>
+    <h2><span class="step">5</span>Pré-visualizar e enviar</h2>
     <div id="preview" class="preview" hidden>
       <div class="pv-meta">
         <div class="muted small" id="pvRowLabel"></div>
@@ -87,9 +89,11 @@
     </div>
     <p id="multiHint" class="note compose-only" hidden></p>
     <div class="actions">
-      <button id="applyBtn" class="primary compose-only" disabled>Aplicar a este email</button>
+      <button id="applyBtn" class="secondary compose-only" disabled>Aplicar a este email</button>
       <button id="resetBtn" class="secondary compose-only" disabled>Repor modelo</button>
-      <button id="draftsBtn" class="primary read-only" disabled>Abrir rascunhos</button>
+      <button id="sendBtn" class="primary" disabled>Enviar emails</button>
+      <button id="stopBtn" class="secondary" hidden>Parar</button>
+      <button id="draftsBtn" class="secondary read-only" disabled>Abrir rascunhos</button>
     </div>
   </section>
 
