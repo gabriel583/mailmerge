@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Excel Mail Merge</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <!-- SheetJS (leitura do Excel). Para não depender do CDN, descarrega este ficheiro para a pasta e muda o src. -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="merge.js"></script>
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <header>
+    <h1>Excel Mail Merge</h1>
+    <span id="modeBadge" class="badge"></span>
+  </header>
+  <p id="modeHint" class="hint"></p>
+
+  <section>
+    <h2><span class="step">1</span>Excel</h2>
+    <label class="file">
+      <input type="file" id="fileInput" accept=".xlsx,.xlsm,.xls,.csv,.ods" />
+      <span id="fileLabel">Escolher ficheiro…</span>
+    </label>
+    <div id="sheetRow" class="field" hidden>
+      <label for="sheetSelect">Folha</label>
+      <select id="sheetSelect"></select>
+    </div>
+    <label class="check small"><input type="checkbox" id="ptNumbers" checked /> Números em formato PT (1 250,50)</label>
+    <p id="fileInfo" class="muted small"></p>
+  </section>
+
+  <section>
+    <h2><span class="step">2</span>Modelo</h2>
+    <button id="readTemplateBtn" class="secondary">Ler email atual</button>
+    <div id="placeholders" class="chips"></div>
+    <p class="muted small">
+      Escreve marcadores como <code>{{Nome}}</code> no assunto ou no corpo, com o mesmo nome dos cabeçalhos do Excel.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="step">3</span>Destinatários</h2>
+    <div class="field">
+      <label for="toCol">Coluna dos destinatários</label>
+      <select id="toCol"></select>
+    </div>
+    <div class="field">
+      <label for="ccCol">Coluna de Cc (opcional)</label>
+      <select id="ccCol"></select>
+    </div>
+    <div class="field compose-only">
+      <label for="toField">Colocar destinatários em</label>
+      <select id="toField">
+        <option value="to">Para</option>
+        <option value="bcc">Bcc</option>
+      </select>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="step">4</span>Linhas</h2>
+    <div class="table-tools">
+      <label><input type="checkbox" id="selectAll" /> Todas</label>
+      <input type="search" id="filter" placeholder="Filtrar…" />
+      <span id="selCount" class="muted small"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="rowsTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="step">5</span>Pré-visualizar e aplicar</h2>
+    <div id="preview" class="preview" hidden>
+      <div class="pv-meta">
+        <div class="muted small" id="pvRowLabel"></div>
+        <div><b>Para:</b> <span id="pvTo"></span></div>
+        <div id="pvCcLine" hidden><b>Cc:</b> <span id="pvCc"></span></div>
+        <div><b>Assunto:</b> <span id="pvSubject"></span></div>
+      </div>
+      <iframe id="pvBody" sandbox="" title="Pré-visualização do corpo"></iframe>
+    </div>
+    <div class="actions">
+      <button id="applyBtn" class="primary compose-only" disabled>Aplicar a este email</button>
+      <button id="resetBtn" class="secondary compose-only" disabled>Repor modelo</button>
+      <button id="draftsBtn" class="primary read-only" disabled>Abrir rascunhos</button>
+    </div>
+  </section>
+
+  <div id="status" role="status" aria-live="polite"></div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
