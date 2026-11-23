@@ -348,7 +348,7 @@ function updatePreview() {
   box.hidden = false;
   $("pvRowLabel").textContent =
     (sel.length ? "" : "Sem linhas selecionadas — a mostrar a 1.ª linha. ") +
-    (group.length > 1 ? `Valores da linha ${excelRow(idx)}; destinatários de ${group.length} linhas.` : `Linha ${excelRow(idx)} do Excel.`);
+    (group.length > 1 ? `Valores da linha ${excelRow(group[0])}; destinatários de ${group.length} linhas.` : `Linha ${excelRow(idx)} do Excel.`);
   const where = state.mode === "compose" && $("toField").value === "bcc" ? " (Bcc)" : "";
   $("pvTo").textContent = (msg.to.valid.join("; ") || "—") + where;
   $("pvCcLine").hidden = !$("ccCol").value;
